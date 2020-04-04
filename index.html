@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+        integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <title>RouteWeather™</title>
+</head>
+
+<div class="jumbotron jumbotron-fluid">
+    <div class="container">
+        <h1 class="display-4" style="text-align: center">RouteWeather™</h1>
+    </div>
+</div>
+
+<body>
+    <div class="container" id="pageBody">
+        <div class="row" id="userInputs">
+            <div class="col" id="startingPoint">
+                <h4>Origin</h4>
+                <input type="text" id="startingPt" class="form-control">
+            </div>
+            <div class="col" id="destination">
+                <h4>Destination</h4>
+                <input type="text" id="destinationPt" class="form-control">
+            </div>
+            <div class="col" id="startingTime">
+                <h4>Start Time (tomorrow)</h4>
+                <input type="time" id="startTm" class="form-control">
+            </div>
+            <div class="col d-flex justify-content-center" id="SubmitBtn">
+                <button id="submit" type="submit"><i class="fa fa-search"></i></button>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-8" id="directionsContainer">
+                <div class="row" id="routeMap">Route Map</div>
+                <div class="row" id="textDirections"></div>
+            </div>
+            <div class="col" id="weatherContainer">
+            </div>
+        </div>
+    </div>
+</body>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script>
+
+    var apiKey = "AIzaSyAprjsxyTtfxU27NuYaKEEz7Gu7iqK52xI";
+    var startCity;
+    var endCity;
+    var startTimeHuman; //will store user entered start time
+    var startTimeUnix; //will store startTimeHuman converted to UNIX
+    var currentTime;
+    var map;
+    var forecastList = [];
+    var weatherChoice = [];
+
+    $("#routeMap").hide();
+    $("#textDirections").hide();
+    $("#weatherContainer").hide();
+
+    var now = new Date(); //retreives current date in unix
+    var beginningOfTomorrow = new Date();
+    beginningOfTomorrow.setDate(now.getDate() + 1);
+    beginningOfTomorrow.setHours(0, 0, 0);
+
+
+    $("#submit").on("click", function () {
+        startCity = $("#startingPt").val().trim();
+        endCity = $("#destinationPt").val().trim();
+        startTimeHuman = $("#startTm").val().trim();
+        var hoursHuman = startTimeHuman.substring(0, 2);
+        var minsHuman = startTimeHuman.substring(3, 5);
+        beginningOfTomorrow.setHours(hoursHuman, minsHuman, 0);
+        startTimeUnix = (beginningOfTomorrow.getTime())/1000;
+        currentTime = startTimeUnix;
+        routeMap();
+    })
+
+
+    function routeMap() {
+
+        $("#weatherContainer").empty();
+        $("#textDirections").empty();
+
+        $("#routeMap").show();
+        $("#weatherContainer").show();
+        $("#textDirections").show();
+
+        var weatherHeader = $("<h4>").text("Weather during route:").appendTo("#weatherContainer");
+        var textDirectionsHeader = $("<h4>").text("Directions:").appendTo("#textDirections");
+
+
+        var route = new Map();
+        $.ajax({
+            url: "https://cors-anywhere.herokuapp.com/https://maps.googleapis.com/maps/api/directions/json?origin=" + startCity + "&destination=" + endCity + "&key=" + apiKey,
+            method: "GET"
+        }).then(function (response) {
+            console.log(response);
+
+            var startLat = response.routes[0].legs[0].start_location.lat;
+            var startLong = response.routes[0].legs[0].start_location.lng;
+            var endLat = response.routes[0].legs[0].end_location.lat;
+            var endLong = response.routes[0].legs[0].end_location.lng;
+
+
+
+            for (i = 0; i < response.routes[0].legs[0].steps.length; i++) {
+                var lat = response.routes[0].legs[0].steps[i].end_location.lat
+                var lng = response.routes[0].legs[0].steps[i].end_location.lng
+                const id = i;
+                
+
+                currentTime += response.routes[0].legs[0].steps[i].duration.value;
+                const elapsedTime = currentTime;
+                console.log(elapsedTime);
+
+                var textDirections = $("<p>").appendTo(textDirectionsHeader).html(response.routes[0].legs[0].steps[i].html_instructions);
+
+                var res = $.ajax({
+                    url: "https://api.openweathermap.org/data/2.5/forecast?lat=" + lat + "&lon=" + lng + "&appid=0148692f495f14a2ef755e446f5b33e4",  //changed to forecast api
+                    method: "GET", async: false
+                })
+
+                res.responseJSON.elapsedTime = elapsedTime;
+                route.set(i, res);
+                //console.log(res);
+
+                if (route.size === response.routes[0].legs[0].steps.length) {
+
+                    var locales = []; //empty array of unique station names
+                    route.forEach(function (station, id) {
+                        var station = station.responseJSON
+                        var duplicate = false //default duplicate value for each new staion.name is no
+
+                        for (var j = 0; j < locales.length; j++) { //compares station.name to those existing in array
+                            if (station.city.name == locales[j]) {
+                                duplicate = true //resets duplicate varianle to yes if there is a match
+                            }
+                        }
+
+                        if (!duplicate) {
+
+                            var forecast;
+                            forecastList.push(station);
+
+                            for (var k = 0; k < station.list.length && forecast == null; k++) {
+                                
+                                if (station.list[k].dt > station.elapsedTime) {
+                                    forecast = station.list[k];
+                                    weatherChoice.push(forecast);
+                                    console.log(new Date(station.list[k].dt*1000))
+                                    console.log(new Date(station.elapsedTime*1000))
+                                }
+                            }
+
+                            locales.push(station.city.name) //push non duplicate station.name into array
+                            console.log(station)
+
+                            var weather = $("<div>").attr("class", "card").attr("id", "weatherCard").appendTo("#weatherContainer");
+                            var weatherData = $("<col>").appendTo(weather);
+                            var weatherIcon = $("<col>").appendTo(weather);
+
+                            var timeAtPoint = convertTimestamp(station.elapsedTime).substring(6,14);
+                            var city = $("<h5>").text(station.city.name + ", " + timeAtPoint).appendTo(weatherData);
+                            var condition = $("<p>").text("Conditions: " + forecast.weather[0].description).appendTo(weatherData);
+                            var tempCalc = Math.round((forecast.main.temp - 273.15) * 9 / 5 + 32);
+                            var temperature = $("<p>").text("Temp: " + tempCalc + " degrees F").appendTo(weatherData);
+                            var forecastIcon = $("<img>").attr("src", "https://openweathermap.org/img/wn/" + forecast.weather[0].icon + "@2x.png").appendTo(weatherIcon);
+                        }
+                    })
+                }
+            }
+
+            initMap(startLat, startLong, endLat, endLong);
+        });
+    }
+
+
+    function initMap(latA, longA, latB, longB) {
+        var pointA = new google.maps.LatLng(latA, longA),
+            pointB = new google.maps.LatLng(latB, longB),
+            myOptions = {
+                zoom: 7,
+                center: pointA,
+                mapTypeId: "satellite"
+            },
+            map = new google.maps.Map(document.getElementById('routeMap'), myOptions),
+            // Instantiate a directions service.
+            directionsService = new google.maps.DirectionsService,
+            directionsDisplay = new google.maps.DirectionsRenderer({
+                map: map
+            })
+
+            setMarkers(map);
+
+            // get route from A to B
+            calculateAndDisplayRoute(directionsService, directionsDisplay, pointA, pointB);
+
+    }
+
+    function setMarkers(map) {
+        for (var h = 0; h < forecastList.length; h++) {
+            var forecastChoice = new google.maps.LatLng(forecastList[h].city.coord.lat, forecastList[h].city.coord.lon);
+            console.log(weatherChoice)
+            var marker = new google.maps.Marker({
+                position: forecastChoice,
+                map: map,
+                icon: "https://openweathermap.org/img/wn/" + weatherChoice[h].weather[0].icon + "@2x.png",
+                size: (20, 20),
+            });
+        }
+    }
+
+
+    function calculateAndDisplayRoute(directionsService, directionsDisplay, pointA, pointB) {
+        directionsService.route({
+            origin: pointA,
+            destination: pointB,
+            travelMode: google.maps.TravelMode.DRIVING
+        }, function (response, status) {
+            if (status == google.maps.DirectionsStatus.OK) {
+                directionsDisplay.setDirections(response);
+            }
+        });
+    }
+
+
+    function convertTimestamp(timestamp) { //converts unix time from API response to conventional time
+        var d = new Date(timestamp * 1000),	
+            mm = (d.getMonth() + 1), 
+            dd = ('0' + d.getDate()).slice(-2),			
+            hh = d.getHours(),
+            h = hh,
+            min = ('0' + d.getMinutes()).slice(-2),		
+            ampm = 'AM',
+            time;
+
+        if (hh > 12) {
+            h = hh - 12;
+            ampm = 'PM';
+        } else if (hh === 12) {
+            h = 12;
+            ampm = 'PM';
+        } else if (hh == 0) {
+            h = 12;
+        }
+
+        time = mm + '/' + dd + ', ' + h + ':' + min + ' ' + ampm;
+        return time;
+    }
+
+</script>
+<script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCAsofqoxiHLikZe_JMOCh7Vb5V05jcvhU&callback=initMap">
+    </script>
+
+</html>
