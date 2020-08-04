@@ -1,6 +1,6 @@
 # RouteWeather
 
-[![HitCount](http://hits.dwyl.com/{jsecomb}/{Homework19}.svg)](http://hits.dwyl.com/{jsecomb}/{Route-Weather})
+[![HitCount](http://hits.dwyl.com/{jsecomb}/{Route-Weather}.svg)](http://hits.dwyl.com/{jsecomb}/{Route-Weather})
 ![GitHub top language](https://img.shields.io/github/languages/top/jsecomb/Route-Weather?style=flat-square)
 ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/jsecomb/Route-Weather?style=flat-square)
 
