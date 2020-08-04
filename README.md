@@ -33,7 +33,7 @@ No installation required.
 
 Deployed [here](https://jsecomb.github.io/Route-Weather/). Usage is self-explanatory.
 
-![Screenshot](https://i.imgur.com/c73J4pr.png?1)
+![Screenshot](https://i.imgur.com/0hw70Su.png?2)
 
 ---
 
